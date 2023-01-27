@@ -2,6 +2,8 @@
 #include<iostream>
 #include<string>
 #include<bitset>
+#include<thread>
+#include<vector>
 #pragma comment(lib, "Ws2_32.lib")
 
 //port 42069
@@ -19,39 +21,23 @@ using namespace std;
 
 
 unsigned int iptoint(string ip) {
-	string pt1 = "";
-	string pt2 = "";
-	string pt3 = "";
-	string pt4 = "";
-	int pt = 0;
+	unsigned int bin = 0;
+	string currentNum = "";
 	for (auto c : ip) {
 		if (c != '.') {
-			switch (pt) {
-			case 0:
-				pt1 += c;
-				break;
-			case 1:
-				pt2 += c;
-				break;
-			case 2:
-				pt3 += c;
-				break;
-			case 3:
-				pt4 += c;
-				break;
-			}
+			currentNum += c;
 		}
-		else
-			pt++;
+		else {
+			string currentBin = bitset<8>(stoi(currentNum)).to_string();
+			for (auto b : currentBin) {
+				bin <<= 1;
+				if (b == '1')
+					bin += 1;
+			}
+			currentNum = "";
+		}
 	}
-	string binip = "";
-
-	binip += bitset<8>(stoi(pt1)).to_string();
-	binip += bitset<8>(stoi(pt2)).to_string();
-	binip += bitset<8>(stoi(pt3)).to_string();
-	binip += bitset<8>(stoi(pt4)).to_string();
-
-	return stoi(binip, 0, 2);
+	return bin;
 }
 
 
@@ -66,13 +52,13 @@ int main() {
 	struct sockaddr_in server_info = { 0 };
 
 	server_info.sin_family = AF_INET;
-	server_info.sin_addr.s_addr = htonl(iptoint("10.17.68.59"));
+	server_info.sin_addr.s_addr = htonl(iptoint("192.168.56.1."));
 	server_info.sin_port = htons(42069);
 	int server_info_len = sizeof(server_info);
 
 
 	SOCKET server_socket = socket(AF_INET, SOCK_STREAM, 0);
-	if (server_socket < 0) {
+	if (server_socket == -1) {
 		perror("Server socket");
 		return -1;
 	}
@@ -82,15 +68,35 @@ int main() {
 		perror("Bind");
 		return -1;
 	}
+	cout << "Connected to the server!" << endl;
 
-	const int buffer_len = 1024;
-	char buffer[buffer_len];
+	char inputText[1500];
+	string outputText;
 
-	int recvd = recv(server_socket, buffer, buffer_len - 1, 0);
-	cout << buffer << endl;
-
-	string uin;
+	while (1)
+	{
+		cout << ">";
+		getline(cin, outputText);
+		memset(&inputText, 0, sizeof(inputText));//clear the buffer
+		strcpy_s(inputText, outputText.c_str());
+		if (outputText == "exit")
+		{
+			send(server_socket, (char*)&inputText, strlen(inputText), 0);
+			break;
+		}
+		send(server_socket, (char*)&inputText, strlen(inputText), 0);
+		cout << "Awaiting server response..." << endl;
+		memset(&inputText, 0, sizeof(inputText));//clear the buffer
+		recv(server_socket, (char*)&inputText, sizeof(inputText), 0);
+		if (!strcmp(inputText, "exit"))
+		{
+			cout << "Server has quit the session" << endl;
+			break;
+		}
+		cout << "Server: " << inputText << endl;
+	}
 
 	closesocket(server_socket);
+	cout << "Connection closed." << endl;
 
 }
